@@ -9,7 +9,7 @@ namespace Task10
         static void Main(string[] args)
         {
             AsteroidMap map = new AsteroidMap();
-            map.Parse(Inputs.TestInput2);
+            map.Parse(Inputs.Task10aInput);
             var result = map.CanSeeMost();
         }
     }
@@ -50,8 +50,7 @@ namespace Task10
             Point bestPoint = new Point(-1, -1);
             foreach (var point in asteroids)
             {
-                var relativeMap = Map(point);
-                var seen = relativeMap.NumberSeenFromCenter();
+                var seen = SeenFromPoint(point);
                 if (seen > best)
                 {
                     best = seen;
@@ -73,26 +72,29 @@ namespace Task10
             return back;
         }
 
-        public int NumberSeenFromCenter()
+        public int SeenFromPoint(Point newCenter)
         {
-            HashSet<Point> points = asteroids.ToHashSet();
-            points.Remove(new Point(0, 0));
-
+            Dictionary<Vector, Point> newMap = new Dictionary<Vector, Point>();
             foreach (var point in asteroids)
             {
-                foreach (var otherPoint in asteroids)
+                if (point == newCenter)
+                    continue;
+
+                var relPoint = point.RelativePoint(newCenter);
+                if (newMap.TryGetValue(relPoint.Vector, out Point existing))
                 {
-                    if (point != otherPoint)
+                    if (existing.Multiplier > relPoint.Multiplier)
                     {
-                        if (point.IsBlocking(otherPoint))
-                        {
-                            points.Remove(otherPoint);
-                        }
+                        newMap[relPoint.Vector] = relPoint;
                     }
+                }
+                else
+                {
+                    newMap.Add(relPoint.Vector, relPoint);
                 }
             }
 
-            return points.Count;
+            return newMap.Count;
         }
     }
 
@@ -123,39 +125,94 @@ namespace Task10
             return !left.Equals(right);
         }
 
-        public int X { get; }
-        public int Y { get; }
+        public Vector Vector { get; }
 
-        public Point(int x, int y)
+        public int Multiplier { get; }
+
+        public int X => Vector.X * Multiplier;
+
+        public int Y => Vector.Y * Multiplier;
+
+        public Point(Vector vector, int multiplier)
         {
-            X = x;
-            Y = y;
-        }
-
-        public bool IsBlocking(Point otherRelative)
-        {
-            if (X == 0 && Y == 0)
-                return false;
-
-            if (X == 0)
+            if (multiplier < 0)
             {
-                return otherRelative.X == 0 && otherRelative.Y / Y > 0 && otherRelative.Y % Y == 0;
-            }
-            else if (Y == 0)
-            {
-                return otherRelative.Y == 0 && otherRelative.X / X > 0 && otherRelative.X % X == 0;
+                Vector = new Vector(vector.X*-1, vector.Y*-1);
+                Multiplier = multiplier * -1;
             }
             else
             {
-                var otherRelativeX = otherRelative.X / X;
-                return otherRelativeX > 0 && otherRelativeX == otherRelative.Y / Y && otherRelative.X % X == 0 &&
-                       otherRelative.Y % Y == 0;
+                Vector = vector;
+                Multiplier = multiplier;
             }
+        }
+
+        public Point(int x, int y)
+        {
+            this = CreatePoint(x, y);
         }
 
         public Point RelativePoint(Point origin)
         {
             return new Point(X - origin.X, Y - origin.Y);
+        }
+
+        public static Point CreatePoint(int x, int y)
+        {
+            switch ((x, y))
+            {
+                case (0, 0):
+                    return new Point(new Vector(0, 0), 0);
+                case (0, _):
+                    return new Point(new Vector(0, 1), y);
+                case (_, 0):
+                    return new Point(new Vector(1, 0), x);
+                case (_, _):
+                    int gcd = MyMath.GCD(x, y);
+                    return new Point(new Vector(x / gcd, y / gcd), gcd);
+            }
+        }
+
+        public override string ToString()
+        {
+            return $"Vector: {Vector} - Multiplier: {Multiplier}";
+        }
+    }
+
+    public struct Vector : IEquatable<Vector>
+    {
+        public bool Equals(Vector other)
+        {
+            return X == other.X && Y == other.Y;
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return obj is Vector other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(X, Y);
+        }
+
+        public static bool operator ==(Vector left, Vector right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(Vector left, Vector right)
+        {
+            return !left.Equals(right);
+        }
+
+        public int X { get; }
+        public int Y { get; }
+
+        public Vector(int x, int y)
+        {
+            X = x;
+            Y = y;
         }
 
         public override string ToString()
